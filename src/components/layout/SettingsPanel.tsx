@@ -1,0 +1,111 @@
+"use client";
+
+import { useChatStore } from "@/store/useChatStore";
+import { useDownloadStore } from "@/store/useDownloadStore";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Shield, Lock, Bell, Download, Trash2, User } from "lucide-react";
+
+export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+  const { isPrivateMode, togglePrivateMode } = useChatStore();
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/40 z-[60]"
+          />
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] bg-tg-sidebar border border-tg-border rounded-3xl z-[70] overflow-hidden shadow-2xl"
+          >
+            <div className="p-6 border-b border-tg-border flex items-center justify-between">
+              <h2 className="text-xl font-bold">Settings</h2>
+              <button onClick={onClose} className="p-2 hover:bg-tg-chat-bg rounded-xl transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-6 flex flex-col gap-8">
+              {/* Account Section */}
+              <section className="flex flex-col gap-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-tg-blue">Account</h3>
+                <div className="flex items-center gap-4 p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
+                  <div className="w-16 h-16 bg-tg-blue rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                    ME
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold">Primary Account</p>
+                    <p className="text-sm text-tg-text-secondary">+1 (555) 001-2024</p>
+                  </div>
+                  <button className="p-2 text-tg-text-secondary hover:text-tg-blue">
+                     <User size={20} />
+                  </button>
+                </div>
+              </section>
+
+              {/* Privacy Section */}
+              <section className="flex flex-col gap-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-tg-blue">Privacy & Security</h3>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
+                    <div className="flex items-center gap-3">
+                      <Lock size={20} className="text-tg-text-secondary" />
+                      <span className="text-sm">Two-Step Verification</span>
+                    </div>
+                    <span className="text-xs text-tg-blue font-bold">ON</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
+                    <div className="flex items-center gap-3">
+                      <Shield size={20} className="text-tg-text-secondary" />
+                      <span className="text-sm">Hidden Chat Vault</span>
+                    </div>
+                    <button 
+                      onClick={() => togglePrivateMode()}
+                      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${isPrivateMode ? 'bg-tg-blue text-white' : 'bg-tg-text-secondary/20 text-tg-text-secondary'}`}
+                    >
+                      {isPrivateMode ? 'Unlock Active' : 'Locked'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Data Section */}
+              <section className="flex flex-col gap-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-tg-blue">Downloads & Storage</h3>
+                <div className="flex flex-col gap-2">
+                   <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
+                    <div className="flex items-center gap-3">
+                      <Download size={20} className="text-tg-text-secondary" />
+                      <span className="text-sm">Default Download Folder</span>
+                    </div>
+                    <span className="text-xs text-tg-text-secondary">~/Downloads/TeleCool</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border group cursor-pointer hover:bg-red-500/10 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Trash2 size={20} className="text-tg-text-secondary group-hover:text-red-500" />
+                      <span className="text-sm group-hover:text-red-500">Clear Cache</span>
+                    </div>
+                    <span className="text-xs text-tg-text-secondary">324.5 MB</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div className="p-6 bg-tg-chat-bg/50 text-center">
+              <p className="text-[10px] text-tg-text-secondary uppercase tracking-[0.2em]">TeleCool Pro v1.0.4 - Premium Edition</p>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
