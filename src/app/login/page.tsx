@@ -11,11 +11,13 @@ import { useChatStore } from "@/store/useChatStore";
 export default function LoginPage() {
   const router = useRouter();
   const setAuthenticated = useChatStore((state) => state.setAuthenticated);
-  const [step, setStep] = useState(1); // 1: Phone, 2: Code
+  const addAccount = useChatStore((state) => state.addAccount);
+  const [step, setStep] = useState(1); // 1: Phone, 2: Code, 3: Password
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
 
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,27 +34,58 @@ export default function LoginPage() {
     }
   };
 
+  const onSuccess = (result: any) => {
+    const user = result.user || result;
+    const profile = {
+      id: user.id?.toString() || "id",
+      phone: phone,
+      firstName: user.firstName || "Telegram",
+      lastName: user.lastName || "User",
+      username: user.username
+    };
+
+    setAuthenticated(profile, result.session);
+    addAccount({
+      id: profile.id,
+      name: profile.username
+        ? `@${profile.username}`
+        : `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || profile.phone,
+      session: result.session,
+      user: profile
+    });
+    
+    router.push("/");
+  };
+
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
       const result: any = await tgService.signIn(code);
-      
-      // Mock user extraction from Telegram response
-      const user = result.user || result;
-      setAuthenticated({
-        id: user.id?.toString() || "id",
-        phone: phone,
-        firstName: user.firstName || "Telegram",
-        lastName: user.lastName || "User",
-        username: user.username
-      });
-      
-      router.push("/");
+      onSuccess(result);
+    } catch (err: any) {
+      if (err.message === "SESSION_PASSWORD_NEEDED") {
+        setStep(3);
+      } else {
+        console.error(err);
+        setError(err.message || "Invalid code or login failed.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result: any = await tgService.checkPassword(password);
+      onSuccess(result);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Invalid code or login failed.");
+      setError(err.message || "Invalid password.");
     } finally {
       setIsLoading(false);
     }
@@ -137,7 +170,7 @@ export default function LoginPage() {
                  <Shield size={12} /> Privacy First Encryption Active
               </div>
             </motion.form>
-          ) : (
+          ) : step === 2 ? (
             <motion.form
               key="step2"
               initial={{ opacity: 0, x: 20 }}
@@ -176,13 +209,55 @@ export default function LoginPage() {
                  {isLoading ? (
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <>Verify & Login <CheckCircle2 size={20} /></>
+                  <>Verify <CheckCircle2 size={20} /></>
                 )}
               </button>
 
               <p className="text-center text-xs text-tg-text-secondary">
                 Didn't receive the code? <button type="button" className="text-tg-blue font-bold">Resend</button>
               </p>
+            </motion.form>
+          ) : (
+            <motion.form
+              key="step3"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onSubmit={handlePasswordSubmit}
+              className="flex flex-col gap-6"
+            >
+              <div className="flex flex-col gap-2 text-center mb-2">
+                <div className="w-12 h-12 bg-tg-blue/10 text-tg-blue rounded-full flex items-center justify-center mx-auto mb-2">
+                   <Lock size={20} />
+                </div>
+                <p className="text-sm text-tg-text-secondary">Two-Step Verification</p>
+                <p className="text-xs text-tg-text-secondary mt-1">Your account is protected by an additional password.</p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-tg-blue ml-2">Password</label>
+                <input 
+                  required
+                  autoFocus
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-tg-chat-bg border border-tg-border rounded-2xl py-4 px-4 text-center focus:outline-none focus:border-tg-blue transition-colors placeholder:text-tg-text-secondary/30"
+                />
+              </div>
+
+              <button 
+                disabled={isLoading || !password}
+                className="w-full bg-tg-blue hover:bg-tg-blue-hover disabled:opacity-50 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 group transition-all"
+              >
+                 {isLoading ? (
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>Unlock & Login <CheckCircle2 size={20} /></>
+                )}
+              </button>
+              
+              <button type="button" onClick={() => setStep(2)} className="text-xs text-tg-blue hover:underline">Back to code</button>
             </motion.form>
           )}
         </AnimatePresence>

@@ -1,22 +1,78 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useChatStore } from "@/store/useChatStore";
 import { cn } from "@/lib/utils";
-import { Search, MoreVertical } from "lucide-react";
+import { Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const MOCK_CHATS = [
-  { id: '1', name: 'John Doe', lastMessage: 'See you there! 👋', time: '12:45 PM', unread: 2, isHidden: false },
-  { id: '2', name: 'Dev Team', lastMessage: 'PR #102 merged', time: '11:20 AM', unread: 0, isHidden: false },
-  { id: '3', name: 'Family Group', lastMessage: 'Dinner at 8?', time: 'Yesterday', unread: 0, isHidden: false },
-  { id: '4', name: 'Crypto Alpha', lastMessage: 'Moon soon 🚀', time: '10:00 AM', unread: 5, isHidden: true },
-  { id: '5', name: 'Private Ops', lastMessage: 'Deployment successful', time: '09:15 AM', unread: 0, isHidden: true },
-];
+interface UiChat {
+  id: string;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  isHidden: boolean;
+}
+
+const formatTime = (timestamp: number) => {
+  if (!timestamp) return "";
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
 
 export const ChatList = () => {
-  const { activeChatId, setActiveChat, isPrivateMode } = useChatStore();
+  const { activeChatId, setActiveChat, isPrivateMode, session } = useChatStore();
+  const [chats, setChats] = useState<UiChat[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredChats = MOCK_CHATS.filter(chat => !chat.isHidden || isPrivateMode);
+  const fetchChats = async () => {
+    if (!session) {
+      console.log("ChatList: No session found, skipping fetch");
+      setChats([]); // Clear chats if no session
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      console.log("ChatList: Fetching chats...");
+      const response = await fetch("/api/chats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session }),
+      });
+      const data = await response.json();
+      console.log("ChatList: Received data:", data);
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch chats");
+      }
+      const uiChats: UiChat[] = (data.chats || []).map((chat: any) => ({
+        id: chat.id,
+        name: chat.name,
+        lastMessage: chat.lastMessage || "",
+        time: formatTime(chat.timestamp),
+        unread: chat.unreadCount || 0,
+        isHidden: chat.isHidden || false,
+      }));
+      setChats(uiChats);
+    } catch (err: any) {
+      console.error("ChatList error:", err);
+      setError(err.message || "Failed to load chats");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChats();
+  }, [session]);
+
+  const filteredChats = useMemo(
+    () => chats.filter((chat) => !chat.isHidden || isPrivateMode),
+    [chats, isPrivateMode]
+  );
 
   return (
     <div className="w-80 h-full border-r border-tg-border flex flex-col">
@@ -75,6 +131,36 @@ export const ChatList = () => {
             </motion.button>
           ))}
         </AnimatePresence>
+
+        {!session && (
+          <div className="p-6 text-center text-sm text-tg-text-secondary">
+            Connect an account to load chats.
+          </div>
+        )}
+
+        {!loading && !error && session && filteredChats.length === 0 && (
+          <div className="p-6 text-center text-sm text-tg-text-secondary">
+            No chats found.
+          </div>
+        )}
+
+        {loading && (
+          <div className="p-6 text-center text-sm text-tg-text-secondary">
+            Loading chats...
+          </div>
+        )}
+
+        {error && (
+          <div className="p-6 text-center">
+            <p className="text-sm text-red-500 mb-2">{error}</p>
+            <button 
+              onClick={fetchChats}
+              className="text-xs text-tg-blue hover:underline font-medium"
+            >
+              Try again
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

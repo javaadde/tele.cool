@@ -43,6 +43,25 @@ export class TelegramService {
     // Success! Store user in Zustand if not already handled
     return data;
   }
+
+  async checkPassword(password: string) {
+    const response = await fetch("/api/auth/check-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        phone: this.phone, 
+        password
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || "Password verification failed");
+    }
+
+    return data;
+  }
 }
 
 export const tgService = new TelegramService();

@@ -1,12 +1,40 @@
 "use client";
 
-import { useChatStore } from "@/store/useChatStore";
+import { useChatStore, UserProf } from "@/store/useChatStore";
 import { useDownloadStore } from "@/store/useDownloadStore";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Shield, Lock, Bell, Download, Trash2, User } from "lucide-react";
+import { X, Shield, Lock, Bell, Download, Trash2, User, LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  const { isPrivateMode, togglePrivateMode } = useChatStore();
+  const { isPrivateMode, togglePrivateMode, user, session, setAuthenticated, logout } = useChatStore();
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchMe = async () => {
+      if (!isOpen || !session) return;
+      
+      setIsLoading(true);
+      try {
+        const response = await fetch("/api/auth/me", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session }),
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.user) {
+          setAuthenticated(data.user, session);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMe();
+  }, [isOpen, session, setAuthenticated]);
 
   return (
     <AnimatePresence>
@@ -33,19 +61,22 @@ export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto p-6 flex flex-col gap-8">
-              {/* Account Section */}
               <section className="flex flex-col gap-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-tg-blue">Account</h3>
                 <div className="flex items-center gap-4 p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
-                  <div className="w-16 h-16 bg-tg-blue rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                    ME
+                  <div className="w-16 h-16 bg-tg-blue rounded-full flex items-center justify-center text-white text-2xl font-bold uppercase overflow-hidden">
+                    {user?.firstName ? user.firstName[0] : (user?.phone ? '?' : 'ME')}
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold">Primary Account</p>
-                    <p className="text-sm text-tg-text-secondary">+1 (555) 001-2024</p>
+                    <p className="font-bold">{user?.firstName || 'User'}{user?.lastName ? ` ${user.lastName}` : ''}</p>
+                    <p className="text-sm text-tg-text-secondary">{user?.phone || 'No phone number'}</p>
+                    {user?.username && <p className="text-xs text-tg-blue">@{user.username}</p>}
                   </div>
-                  <button className="p-2 text-tg-text-secondary hover:text-tg-blue">
-                     <User size={20} />
+                  <button 
+                    onClick={() => logout()}
+                    className="p-2 text-tg-text-secondary hover:text-red-500 transition-colors"
+                  >
+                     <LogOut size={20} />
                   </button>
                 </div>
               </section>
@@ -89,12 +120,19 @@ export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                     <span className="text-xs text-tg-text-secondary">~/Downloads/TeleCool</span>
                   </div>
                   
-                  <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border group cursor-pointer hover:bg-red-500/10 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <Trash2 size={20} className="text-tg-text-secondary group-hover:text-red-500" />
-                      <span className="text-sm group-hover:text-red-500">Clear Cache</span>
+                  <div 
+                    onClick={() => {
+                      if(confirm("Are you sure? This will log out all accounts and clear all local data.")) {
+                        useChatStore.getState().clearAll();
+                      }
+                    }}
+                    className="flex items-center justify-between p-4 bg-red-500/10 rounded-2xl border border-red-500/20 group cursor-pointer hover:bg-red-500/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 text-red-500">
+                      <Trash2 size={20} />
+                      <span className="text-sm font-bold">Clear All Data & Logout</span>
                     </div>
-                    <span className="text-xs text-tg-text-secondary">324.5 MB</span>
+                    <span className="text-[10px] text-red-400 font-bold uppercase">Dangerous</span>
                   </div>
                 </div>
               </section>
