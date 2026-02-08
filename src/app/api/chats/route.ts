@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
         lastMessage,
         timestamp,
         unreadCount: dialog.unreadCount || 0,
-        isHidden: false, // Default, will be filtered by frontend
+        isHidden: false,
+        avatar: `/api/avatar?peerId=${id}&session=${encodeURIComponent(session)}`,
       };
     });
 

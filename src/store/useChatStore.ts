@@ -42,22 +42,30 @@ interface ChatState {
   user: UserProf | null;
   session: string | null;
   accounts: Account[];
+  chats: Chat[];
   activeAccountId: string | null;
   activeChatId: string | null;
   isPrivateMode: boolean;
   revealTriggered: boolean;
+  privateModePassword: string | null;
+  privateModePattern: number[] | null;
+  hiddenChatIds: string[];
   
   // Actions
   setAuthenticated: (user: UserProf, session: string) => void;
   addAccount: (account: Omit<Account, 'isActive'>) => void;
   renameAccount: (id: string, name: string) => void;
+  setChats: (chats: Chat[]) => void;
   logout: () => void;
   clearAll: () => void;
   setActiveAccount: (id: string) => void;
   setActiveChat: (id: string | null) => void;
-  togglePrivateMode: (pin?: string) => void;
+  togglePrivateMode: (val?: string | number[]) => boolean;
   setRevealTriggered: (val: boolean) => void;
+  setPrivateModePassword: (password: string) => void;
+  setPrivateModePattern: (pattern: number[]) => void;
   hideChat: (chatId: string) => void;
+  unhideChat: (chatId: string) => void;
   addMessage: (chatId: string, message: Message) => void;
   removeAccount: (id: string) => void;
 }
@@ -69,10 +77,14 @@ export const useChatStore = create<ChatState>()(
       user: null,
       session: null,
       accounts: [],
+      chats: [],
       activeAccountId: null,
       activeChatId: null,
       isPrivateMode: false,
       revealTriggered: false,
+      privateModePassword: null,
+      privateModePattern: null,
+      hiddenChatIds: [],
 
       setAuthenticated: (user, session) => 
         set((state) => ({ 
@@ -111,11 +123,13 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           accounts: state.accounts.map((acc) => (acc.id === id ? { ...acc, name } : acc)),
         })),
+      setChats: (chats) => set({ chats }),
       logout: () => set({ 
         isAuthenticated: false, 
         user: null, 
         session: null, 
         accounts: [], 
+        chats: [],
         activeAccountId: null,
         activeChatId: null,
         isPrivateMode: false
@@ -127,6 +141,7 @@ export const useChatStore = create<ChatState>()(
           user: null, 
           session: null, 
           accounts: [], 
+          chats: [],
           activeAccountId: null,
           activeChatId: null,
           isPrivateMode: false
@@ -140,7 +155,8 @@ export const useChatStore = create<ChatState>()(
           activeChatId: null,
           session: account?.session || null,
           user: account?.user || null,
-          isAuthenticated: !!account?.session
+          isAuthenticated: !!account?.session,
+          chats: [] // Clear chats when switching accounts
         };
       }),
       setActiveChat: (id) => set({ activeChatId: id }),
@@ -151,15 +167,40 @@ export const useChatStore = create<ChatState>()(
         activeAccountId: state.activeAccountId === id ? (state.accounts.find(a => a.id !== id)?.id || null) : state.activeAccountId
       })),
 
-      togglePrivateMode: (pin) => set((state) => {
-        // In a real app, verify PIN against hash
-        if (state.isPrivateMode) return { isPrivateMode: false };
-        if (pin === '1234') return { isPrivateMode: true };
-        return state;
-      }),
+      togglePrivateMode: (val) => {
+        let success = false;
+        set((state) => {
+          if (state.isPrivateMode) {
+            success = true;
+            return { isPrivateMode: false };
+          }
+          
+          if (typeof val === 'string' && state.privateModePassword && val === state.privateModePassword) {
+            success = true;
+            return { isPrivateMode: true };
+          }
+          
+          if (Array.isArray(val) && state.privateModePattern && JSON.stringify(val) === JSON.stringify(state.privateModePattern)) {
+            success = true;
+            return { isPrivateMode: true };
+          }
+          
+          return state;
+        });
+        return success;
+      },
+
+      setPrivateModePassword: (password) => set({ privateModePassword: password }),
+      setPrivateModePattern: (pattern) => set({ privateModePattern: pattern }),
 
       hideChat: (chatId) => set((state) => ({
-        // Logic to mark chat as hidden in state
+        hiddenChatIds: state.hiddenChatIds.includes(chatId) 
+          ? state.hiddenChatIds 
+          : [...state.hiddenChatIds, chatId]
+      })),
+
+      unhideChat: (chatId) => set((state) => ({
+        hiddenChatIds: state.hiddenChatIds.filter(id => id !== chatId)
       })),
 
       addMessage: (chatId, message) => set((state) => ({
@@ -173,7 +214,10 @@ export const useChatStore = create<ChatState>()(
         activeAccountId: state.activeAccountId,
         isAuthenticated: state.isAuthenticated,
         user: state.user,
-        session: state.session
+        session: state.session,
+        privateModePassword: state.privateModePassword,
+        privateModePattern: state.privateModePattern,
+        hiddenChatIds: state.hiddenChatIds
       }),
     }
   )

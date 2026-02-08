@@ -1,12 +1,12 @@
 "use client";
 
-import { useDownloadStore, DownloadTask } from "@/store/useDownloadStore";
+import { useDownloadStore } from "@/store/useDownloadStore";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Download, Pause, Play, CheckCircle2, ChevronDown, Rocket, Shield } from "lucide-react";
+import { X, Download, Pause, Play, CheckCircle2, Rocket, Settings, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const DownloadManager = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
-  const { tasks, globalSpeedLimit, setSpeedLimit } = useDownloadStore();
+  const { tasks, completedTasks, clearCompleted, removeTask, defaultDestination } = useDownloadStore();
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -14,6 +14,15 @@ export const DownloadManager = ({ isOpen, onClose }: { isOpen: boolean, onClose:
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleSaveAs = (task: any) => {
+     const link = document.createElement('a');
+     link.href = `/api/download/file?name=${encodeURIComponent(task.name)}&path=${encodeURIComponent(defaultDestination)}`;
+     link.download = task.name;
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
   };
 
   return (
@@ -47,87 +56,115 @@ export const DownloadManager = ({ isOpen, onClose }: { isOpen: boolean, onClose:
               </button>
             </div>
 
-            {/* Throttling Controls */}
-            <div className="p-4 border-b border-tg-border bg-tg-chat-bg/30">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-medium">Download Speed Control</span>
-                <span className={cn(
-                  "text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider",
-                  globalSpeedLimit === null ? "bg-tg-blue text-white" : "bg-tg-text-secondary/20 text-tg-text-secondary"
-                )}>
-                  {globalSpeedLimit === null ? "Turbo Mode" : "Limited"}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {[null, 1024 * 1024 * 2, 1024 * 1024 * 10].map((limit) => (
-                  <button
-                    key={String(limit)}
-                    onClick={() => setSpeedLimit(limit)}
-                    className={cn(
-                      "flex-1 text-[10px] py-2 rounded-lg border transition-all",
-                      globalSpeedLimit === limit 
-                        ? "bg-tg-blue border-tg-blue text-white" 
-                        : "bg-transparent border-tg-border text-tg-text-secondary hover:border-tg-blue/50"
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+              {/* Active Section */}
+              <section className="flex flex-col gap-3">
+                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-tg-blue flex items-center justify-between">
+                    Active Transfers
+                    <span className="bg-tg-blue/10 px-2 py-0.5 rounded-full">{tasks.length}</span>
+                 </h3>
+                 {tasks.length === 0 ? (
+                   <div className="py-8 flex flex-col items-center justify-center text-tg-text-secondary gap-3 opacity-30 bg-tg-chat-bg/30 rounded-2xl border border-dashed border-tg-border">
+                      <Download size={32} />
+                      <p className="text-[10px] font-bold uppercase">No active files</p>
+                   </div>
+                 ) : (
+                   tasks.map((task) => (
+                     <div key={task.id} className="bg-tg-chat-bg border border-tg-border rounded-xl p-3 flex flex-col gap-3 group hover:border-tg-blue/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-tg-blue/10 rounded-lg text-tg-blue">
+                             <Download size={18} className={task.status === 'downloading' ? 'animate-bounce' : ''} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold truncate">{task.name}</p>
+                            <p className="text-[9px] text-tg-text-secondary font-medium">
+                              {formatSize(task.size)} • <span className="capitalize">{task.status}</span>
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                             <button className="p-1.5 hover:bg-tg-sidebar rounded-lg text-tg-text-secondary hover:text-tg-blue transition-colors">
+                                {task.status === 'downloading' ? <Pause size={14} /> : <Play size={14} />}
+                             </button>
+                             <button 
+                                onClick={() => removeTask(task.id)}
+                                className="p-1.5 hover:bg-tg-sidebar rounded-lg text-tg-text-secondary hover:text-red-500 transition-colors"
+                             >
+                                <X size={14} />
+                             </button>
+                          </div>
+                        </div>
+
+                        <div className="w-full h-1 bg-tg-sidebar rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${task.progress}%` }}
+                            className="h-full bg-tg-blue"
+                          />
+                        </div>
+
+                        <div className="flex justify-between items-center text-[9px] text-tg-text-secondary font-mono">
+                          <span>{Math.round(task.progress)}%</span>
+                          <span className="flex items-center gap-1 text-tg-blue">
+                             <Rocket size={8} className="animate-pulse" /> {task.speed ? formatSize(task.speed) : '0 B'}/s
+                          </span>
+                        </div>
+                     </div>
+                   ))
+                 )}
+              </section>
+
+              {/* Finished Section */}
+              <section className="flex flex-col gap-3">
+                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-green-500 flex items-center justify-between">
+                    Finished Downloads
+                    {completedTasks.length > 0 && (
+                       <button onClick={clearCompleted} className="hover:text-red-500 transition-colors">Clear</button>
                     )}
-                  >
-                    {limit === null ? "Max Speed" : `${formatSize(limit)}/s`}
-                  </button>
-                ))}
-              </div>
+                 </h3>
+                 {completedTasks.length === 0 ? (
+                   <div className="py-8 flex flex-col items-center justify-center text-tg-text-secondary gap-3 opacity-30 bg-tg-chat-bg/30 rounded-2xl border border-dashed border-tg-border">
+                      <CheckCircle2 size={32} />
+                      <p className="text-[10px] font-bold uppercase">No history</p>
+                   </div>
+                 ) : (
+                   completedTasks.map((task) => (
+                      <div key={task.id} className="bg-tg-chat-bg/50 border border-tg-border rounded-xl p-3 flex items-center gap-3 group hover:border-tg-blue/30 transition-colors">
+                         <div className="w-8 h-8 bg-green-500/10 rounded-lg flex items-center justify-center text-green-500 shrink-0">
+                            <CheckCircle2 size={16} />
+                         </div>
+                         <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold truncate">{task.name}</p>
+                            <p className="text-[9px] text-tg-text-secondary">{formatSize(task.size)} • Completed</p>
+                         </div>
+                         <div className="flex gap-1">
+                            <button 
+                               onClick={() => handleSaveAs(task)}
+                               className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-tg-blue/10 hover:text-tg-blue rounded-lg transition-all"
+                               title="Save As..."
+                            >
+                               <Save size={14} />
+                            </button>
+                            <button 
+                               onClick={() => removeTask(task.id)}
+                               className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all"
+                            >
+                               <X size={14} />
+                            </button>
+                         </div>
+                      </div>
+                   ))
+                 )}
+              </section>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              {tasks.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-tg-text-secondary gap-3 opacity-50">
-                   <Download size={48} />
-                   <p className="text-sm">No active downloads</p>
+            <div className="p-4 border-t border-tg-border bg-tg-chat-bg/50 mt-auto">
+                <div className="flex items-center justify-between text-[9px] text-tg-text-secondary mb-2 px-1">
+                   <span className="font-bold uppercase tracking-widest">Storage Path</span>
+                   <Settings size={10} />
                 </div>
-              ) : (
-                tasks.map((task) => (
-                  <div key={task.id} className="bg-tg-chat-bg border border-tg-border rounded-xl p-3 flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-tg-blue/10 rounded-lg text-tg-blue">
-                         <Download size={18} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{task.name}</p>
-                        <p className="text-[10px] text-tg-text-secondary">
-                          {formatSize(task.size)} • {task.status}
-                        </p>
-                      </div>
-                      <button className="text-tg-text-secondary hover:text-tg-blue">
-                         {task.status === 'downloading' ? <Pause size={18} /> : <Play size={18} />}
-                      </button>
-                    </div>
-
-                    <div className="w-full h-1.5 bg-tg-sidebar rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${task.progress}%` }}
-                        className="h-full bg-tg-blue"
-                      />
-                    </div>
-
-                    <div className="flex justify-between items-center text-[10px] text-tg-text-secondary">
-                      <span>{task.progress}% complete</span>
-                      <span className="flex items-center gap-1 font-mono text-tg-blue">
-                         <Rocket size={10} /> 4.2 MB/s
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            <div className="p-4 border-t border-tg-border bg-tg-chat-bg/50">
-               <div className="flex items-center gap-3 p-3 bg-tg-blue rounded-xl text-white">
-                  <Shield size={20} />
-                  <div className="flex-1">
-                     <p className="text-xs font-bold">Premium Traffic</p>
-                     <p className="text-[10px] opacity-80">Encrypted transmission via TeleCool Pro</p>
-                  </div>
-                  <ChevronDown size={16} />
-               </div>
+                <div className="p-3 bg-tg-sidebar border border-tg-border rounded-xl text-[10px] font-mono text-tg-blue overflow-hidden truncate">
+                   {defaultDestination}
+                </div>
             </div>
           </motion.div>
         </>

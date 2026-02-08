@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
   const { isPrivateMode, togglePrivateMode, user, session, setAuthenticated, logout } = useChatStore();
+  const { defaultDestination } = useDownloadStore();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -112,12 +113,19 @@ export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
               <section className="flex flex-col gap-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-tg-blue">Downloads & Storage</h3>
                 <div className="flex flex-col gap-2">
-                   <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
+                  <div className="flex items-center justify-between p-4 bg-tg-chat-bg rounded-2xl border border-tg-border">
                     <div className="flex items-center gap-3">
                       <Download size={20} className="text-tg-text-secondary" />
                       <span className="text-sm">Default Download Folder</span>
                     </div>
-                    <span className="text-xs text-tg-text-secondary">~/Downloads/TeleCool</span>
+                    <input 
+                      type="text"
+                      className="text-xs text-tg-blue bg-transparent border-none text-right focus:outline-none focus:underline cursor-pointer w-48"
+                      value={defaultDestination}
+                      onChange={(e) => {
+                        useDownloadStore.setState({ defaultDestination: e.target.value });
+                      }}
+                    />
                   </div>
                   
                   <div 
@@ -139,7 +147,7 @@ export const SettingsPanel = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
             </div>
 
             <div className="p-6 bg-tg-chat-bg/50 text-center">
-              <p className="text-[10px] text-tg-text-secondary uppercase tracking-[0.2em]">TeleCool Pro v1.0.4 - Premium Edition</p>
+              <p className="text-[10px] text-tg-text-secondary uppercase tracking-[0.2em]">TeleCool v1.0.4 - Web Edition</p>
             </div>
           </motion.div>
         </>

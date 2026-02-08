@@ -13,6 +13,7 @@ interface UiChat {
   time: string;
   unread: number;
   isHidden: boolean;
+  avatar?: string;
 }
 
 const formatTime = (timestamp: number) => {
@@ -22,10 +23,23 @@ const formatTime = (timestamp: number) => {
 };
 
 export const ChatList = () => {
-  const { activeChatId, setActiveChat, isPrivateMode, session } = useChatStore();
+  const { 
+    activeChatId, 
+    setActiveChat, 
+    isPrivateMode, 
+    session, 
+    setChats: setGlobalChats,
+    hiddenChatIds,
+    hideChat,
+    unhideChat,
+    privateModePassword,
+    privateModePattern,
+    setRevealTriggered
+  } = useChatStore();
   const [chats, setChats] = useState<UiChat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const fetchChats = async () => {
     if (!session) {
@@ -55,8 +69,18 @@ export const ChatList = () => {
         time: formatTime(chat.timestamp),
         unread: chat.unreadCount || 0,
         isHidden: chat.isHidden || false,
+        avatar: chat.avatar,
       }));
       setChats(uiChats);
+      setGlobalChats(uiChats.map(c => ({
+        id: c.id,
+        name: c.name,
+        unreadCount: c.unread,
+        isHidden: c.isHidden,
+        timestamp: 0, // We don't have the raw timestamp here easily, but it's fine for now
+        avatar: c.avatar,
+        messages: []
+      })));
     } catch (err: any) {
       console.error("ChatList error:", err);
       setError(err.message || "Failed to load chats");
@@ -70,12 +94,12 @@ export const ChatList = () => {
   }, [session]);
 
   const filteredChats = useMemo(
-    () => chats.filter((chat) => !chat.isHidden || isPrivateMode),
-    [chats, isPrivateMode]
+    () => chats.filter((chat) => !hiddenChatIds.includes(chat.id) || isPrivateMode),
+    [chats, hiddenChatIds, isPrivateMode]
   );
 
   return (
-    <div className="w-80 h-full border-r border-tg-border flex flex-col">
+    <div className="w-80 h-full border-r border-tg-border flex flex-col relative" onClick={() => setContextMenu(null)}>
       <div className="p-4 flex items-center gap-2">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-tg-text-secondary" size={16} />
@@ -96,14 +120,22 @@ export const ChatList = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}
               onClick={() => setActiveChat(chat.id)}
+              onContextMenu={(e) => {
+                 e.preventDefault();
+                 setContextMenu({ id: chat.id, x: e.clientX, y: e.clientY });
+              }}
               className={cn(
                 "w-full p-3 flex items-center gap-3 hover:bg-tg-sidebar/30 transition-colors relative group",
                 activeChatId === chat.id && "bg-tg-blue/10"
               )}
             >
-              <div className="w-12 h-12 rounded-full bg-tg-blue/20 flex items-center justify-center text-tg-blue shrink-0 overflow-hidden relative">
-                <span className="text-lg font-semibold">{chat.name[0]}</span>
-                {chat.isHidden && isPrivateMode && (
+              <div className="w-12 h-12 rounded-full bg-tg-blue/20 flex items-center justify-center text-tg-blue shrink-0 overflow-hidden relative border border-transparent group-hover:border-tg-blue/30 transition-all">
+                {chat.avatar ? (
+                  <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg font-semibold">{chat.name[0]}</span>
+                )}
+                {hiddenChatIds.includes(chat.id) && isPrivateMode && (
                    <div className="absolute inset-0 bg-tg-blue/20 backdrop-blur-[1px] flex items-center justify-center">
                       <div className="w-1.5 h-1.5 rounded-full bg-tg-blue animate-pulse" />
                    </div>
@@ -131,6 +163,38 @@ export const ChatList = () => {
             </motion.button>
           ))}
         </AnimatePresence>
+        
+        {contextMenu && (
+            <div 
+                className="fixed z-[60] bg-tg-sidebar border border-tg-border rounded-xl shadow-2xl py-1 w-40 animate-in fade-in zoom-in duration-200"
+                style={{ top: contextMenu.y, left: contextMenu.x }}
+            >
+                {hiddenChatIds.includes(contextMenu.id) ? (
+                   <button 
+                      onClick={() => {
+                          unhideChat(contextMenu.id);
+                          setContextMenu(null);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-tg-blue hover:text-white transition-colors flex items-center gap-2"
+                   >
+                      Unhide Chat
+                   </button>
+                ) : (
+                   <button 
+                      onClick={() => {
+                          if (!privateModePassword && !privateModePattern) {
+                             setRevealTriggered(true);
+                          }
+                          hideChat(contextMenu.id);
+                          setContextMenu(null);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm hover:bg-tg-blue hover:text-white transition-colors flex items-center gap-2"
+                   >
+                      Hide Chat
+                   </button>
+                )}
+            </div>
+        )}
 
         {!session && (
           <div className="p-6 text-center text-sm text-tg-text-secondary">
